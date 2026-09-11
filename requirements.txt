@@ -1,0 +1,4 @@
+mcp[cli]>=1.29.0,<2
+nodriver>=0.40
+google-auth>=2.30
+google-auth-oauthlib>=1.2

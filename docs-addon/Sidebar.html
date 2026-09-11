@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    /* Design tokens -- a LexisNexis-inspired palette (their brand red for
+       primary accents/active states) paired with a meaningful two-family
+       chip system: cool blue/indigo for case-law citation types
+       (IndianKanoon), green/teal for legislation types (IndiaCode) -- so
+       color carries real information (which source a citation belongs
+       to), not just decoration. Sampled from LexisNexis's own logo tile
+       and the Lexis Create+ product (soft lavender AI cards, pill-shaped
+       filter chips, minimal chrome) rather than guessed. */
+    :root {
+      --lx-red: #C8102E;
+      --lx-red-dark: #9E0B22;
+      --lx-red-tint: #FBEAEC;
+      --lx-ink: #1F2124;
+      --lx-muted: #6B7280;
+      --lx-border: #E5E7EB;
+      --lx-bg: #FAFAFA;
+      --lx-card: #FFFFFF;
+      --lx-green: #1E8E3E;
+      --lx-green-tint: #E6F4EA;
+      --lx-amber: #B45309;
+      --lx-amber-tint: #FEF3E2;
+      --lx-radius: 8px;
+      --lx-radius-sm: 6px;
+      --lx-shadow: 0 1px 2px rgba(31,33,36,.06), 0 1px 1px rgba(31,33,36,.04);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13px; margin: 0; padding: 12px; color: var(--lx-ink); background: var(--lx-bg);
+    }
+    h1, h2, h3, h4 { font-family: inherit; }
+    #q { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--lx-border); border-radius: var(--lx-radius); font-size: 13px; }
+    #q:focus { outline: none; border-color: var(--lx-red); box-shadow: 0 0 0 2px var(--lx-red-tint); }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .filters select, .filters input {
+      font-size: 11px; padding: 5px 8px; flex: 1 1 auto; min-width: 70px;
+      border: 1px solid var(--lx-border); border-radius: 999px; background: var(--lx-card); color: var(--lx-ink);
+    }
+    #controls { margin-bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    button {
+      font-family: inherit; font-size: 12px; padding: 6px 12px; cursor: pointer;
+      border: 1px solid var(--lx-red); border-radius: var(--lx-radius-sm);
+      background: var(--lx-red); color: #fff; font-weight: 600; transition: background .1s ease;
+    }
+    button:hover { background: var(--lx-red-dark); border-color: var(--lx-red-dark); }
+    button.secondary {
+      background: var(--lx-card); color: var(--lx-ink); border-color: var(--lx-border); font-weight: 500;
+    }
+    button.secondary:hover { background: #F3F4F6; border-color: #D1D5DB; }
+    #status { color: var(--lx-muted); font-size: 11px; margin-bottom: 8px; min-height: 14px; }
+    .result {
+      background: var(--lx-card); border: 1px solid var(--lx-border); border-left: 3px solid #4C7CF3;
+      border-radius: var(--lx-radius-sm); box-shadow: var(--lx-shadow); padding: 10px 12px; margin-bottom: 8px;
+    }
+    .result h4 { margin: 0 0 3px; font-size: 13px; line-height: 1.3; }
+    .result h4 a { color: var(--lx-ink); text-decoration: none; font-weight: 600; }
+    .result h4 a:hover { color: var(--lx-red); text-decoration: underline; }
+    .meta { color: var(--lx-muted); font-size: 11px; margin-bottom: 5px; }
+    .meta .stat { margin-right: 8px; }
+    .snippet { font-size: 12px; color: #3C4043; margin-bottom: 8px; line-height: 1.4; }
+    .actions { margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .actions button { font-size: 11px; padding: 4px 10px; margin: 0; }
+    .detail { background: #FBFBFC; border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); padding: 10px; margin-top: 8px; font-size: 12px; }
+    .detail .docmeta { color: var(--lx-muted); margin-bottom: 6px; }
+    .excerpt { border-left: 3px solid var(--lx-red); padding: 6px 10px; margin-bottom: 8px; background: #fff; border-radius: 0 var(--lx-radius-sm) var(--lx-radius-sm) 0; }
+    .excerpt .type { font-weight: 700; font-size: 10px; letter-spacing: .03em; text-transform: uppercase; color: var(--lx-red); margin-bottom: 3px; }
+    .excerpt button { font-size: 10px; padding: 3px 8px; margin-top: 5px; }
+    .body-text { white-space: pre-wrap; max-height: 220px; overflow-y: auto; border-top: 1px solid var(--lx-border); padding-top: 8px; margin-top: 8px; line-height: 1.5; }
+    .citelist { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--lx-border); }
+    .citelist .result { padding: 8px 10px; }
+    .low-confidence { color: var(--lx-amber); background: var(--lx-amber-tint); border-radius: var(--lx-radius-sm); padding: 4px 8px; font-size: 11px; margin-top: 4px; }
+    .jump-note { color: var(--lx-muted); font-size: 11px; margin-bottom: 8px; line-height: 1.4; }
+    .textsearch-bar { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+    .textsearch-bar input { flex: 1; font-size: 11px; padding: 4px 6px; border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); }
+    .textsearch-bar button { font-size: 11px; padding: 3px 7px; margin: 0; line-height: 1; }
+    .textsearch-count { color: var(--lx-muted); font-size: 10px; white-space: nowrap; min-width: 46px; text-align: right; }
+    mark { background: #FDE68A; padding: 0 1px; border-radius: 2px; }
+    mark.current-match { background: var(--lx-red); color: #fff; }
+    .digest-area { border-top: 1px solid var(--lx-border); margin-top: 10px; padding-top: 10px; }
+    .rel-item { margin-bottom: 4px; font-size: 12px; }
+    .rel-tag { font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; }
+    .rel-tag.yes { color: var(--lx-green); background: var(--lx-green-tint); }
+    .rel-tag.no { color: var(--lx-muted); background: #F1F2F3; }
+    .rel-badge { font-size: 11px; margin: 2px 0 6px; }
+    .rel-badge.checking { color: var(--lx-muted); font-style: italic; }
+    .tools-row { display: flex; gap: 6px; margin: 10px 0; flex-wrap: wrap; }
+    .tools-row button { font-size: 11px; padding: 5px 10px; }
+    #citeTemplateInput { width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 11px; margin-bottom: 6px; border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); }
+    #citeFormatArea, #findAllArea, #foldersArea { border-top: 1px solid var(--lx-border); margin-top: 10px; padding-top: 10px; }
+    .citation-match { background: var(--lx-card); border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); box-shadow: var(--lx-shadow); padding: 8px 10px; margin-bottom: 8px; }
+    .citation-match .ctype { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; display: inline-block; }
+    .citation-match .ctext { font-size: 12px; margin: 5px 0; color: var(--lx-ink); }
+    /* Citation-type chip colors -- blue/indigo family = case-law types
+       (IndianKanoon), green/teal family = legislation types (IndiaCode),
+       so the color itself tells you which source a match will link to. */
+    .ctype-air, .ctype-scc { color: #1967D2; background: #E8F0FE; }
+    .ctype-scc-online { color: #00838F; background: #E0F7FA; }
+    .ctype-neutral { color: #5C6BC0; background: #E8EAF6; }
+    .ctype-case-number { color: #546E7A; background: #ECEFF1; }
+    .ctype-case-name { color: var(--lx-red); background: var(--lx-red-tint); }
+    .ctype-act { color: var(--lx-green); background: var(--lx-green-tint); }
+    .ctype-rules { color: #00695C; background: #E0F2F1; }
+    .format-result { font-size: 11px; margin-top: 4px; }
+    .format-ok { color: var(--lx-green); }
+    .format-bad { color: var(--lx-red); }
+    .link-choice { border-top: 1px solid var(--lx-border); padding: 6px 0; font-size: 11px; }
+    .save-form { margin: 4px 0; }
+    .save-form input { font-size: 11px; padding: 5px 8px; width: 60%; border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); }
+    .folder-row { display: flex; gap: 6px; margin-bottom: 8px; }
+    .folder-row select, .folder-row input { font-size: 11px; padding: 5px 8px; border: 1px solid var(--lx-border); border-radius: 999px; }
+    .folder-item { display: flex; justify-content: space-between; align-items: center; background: var(--lx-card); border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); padding: 6px 10px; margin-bottom: 6px; font-size: 12px; }
+    .folder-item .fi-actions button { font-size: 10px; padding: 3px 8px; }
+    .source-tabs { display: flex; gap: 2px; margin-bottom: 12px; background: #F1F2F4; border-radius: 999px; padding: 3px; }
+    .source-tab {
+      flex: 1; padding: 7px 2px; font-size: 10px; font-weight: 600; background: none; border: none;
+      border-radius: 999px; cursor: pointer; color: var(--lx-muted);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; white-space: nowrap;
+    }
+    .source-tab svg { width: 15px; height: 15px; flex: none; }
+    .source-tab.active { background: var(--lx-card); color: var(--lx-red); box-shadow: var(--lx-shadow); }
+    /* Overrides the generic button:hover (dark red) rule above -- it wins
+       by specificity otherwise, since :hover on the bare element selector
+       out-weighs .source-tab's own un-hovered background:none. */
+    .source-tab:hover { background: var(--lx-card); color: var(--lx-ink); border-color: transparent; }
+    .source-tab.active:hover { color: var(--lx-red); }
+    #icPanel #icQ { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--lx-border); border-radius: var(--lx-radius); }
+    #icPanel .filters { margin-bottom: 8px; }
+    .saved-answer-item { background: var(--lx-card); border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); box-shadow: var(--lx-shadow); padding: 8px 10px; margin-bottom: 8px; font-size: 12px; }
+    .saved-answer-item .sa-title { font-weight: 600; cursor: pointer; color: var(--lx-ink); }
+    .saved-answer-item .sa-title:hover { color: var(--lx-red); }
+    .saved-answer-item .sa-meta { color: var(--lx-muted); font-size: 11px; margin: 2px 0 4px; }
+    .sa-text { white-space: pre-wrap; background: #FBFBFC; border: 1px solid var(--lx-border); border-radius: var(--lx-radius-sm); padding: 8px; margin: 8px 0; font-size: 12px; line-height: 1.5; }
+    #xrefArea { border-top: 1px solid var(--lx-border); margin-top: 10px; padding-top: 10px; }
+    .xref-issue { background: var(--lx-red-tint); border-radius: var(--lx-radius-sm); padding: 6px 10px; margin-bottom: 6px; font-size: 12px; }
+    .xref-issue .xtext { font-weight: 700; color: var(--lx-red-dark); }
+    #comparePanel .filters { margin-bottom: 8px; }
+    #comparePanel select, #comparePanel input { font-size: 11px; padding: 5px 8px; border: 1px solid var(--lx-border); border-radius: 999px; }
+    #compareGdocUrl { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border-radius: var(--lx-radius); }
+    .diff-box { white-space: pre-wrap; background: #FBFBFC; border: 1px solid var(--lx-border); border-radius: var(--lx-radius); padding: 10px; margin-top: 10px; font-size: 12px; line-height: 1.7; }
+    .diff-insert { background: var(--lx-green-tint); color: var(--lx-green); text-decoration: none; border-radius: 2px; }
+    .diff-delete { background: var(--lx-red-tint); color: var(--lx-red-dark); text-decoration: line-through; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div class="source-tabs">
+    <button class="source-tab active" id="tabIK" onclick="switchSourceTab('ik')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/></svg>
+      IndiaKanoon
+    </button>
+    <button class="source-tab" id="tabIC" onclick="switchSourceTab('ic')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      IndiaCode
+    </button>
+    <button class="source-tab" id="tabSA" onclick="switchSourceTab('sa')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      Saved
+    </button>
+    <button class="source-tab" id="tabCM" onclick="switchSourceTab('cm')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/></svg>
+      Compare
+    </button>
+  </div>
+  <div id="savedAnswersArea" hidden>
+    <button class="secondary" onclick="refreshSavedAnswers()">Refresh</button>
+    <div id="savedAnswersList"></div>
+  </div>
+  <div id="ikPanel">
+  <input id="q" type="text" placeholder="e.g. specific performance breach of contract" />
+  <div class="filters">
+    <select id="doctypes">
+      <option value="">All document types</option>
+      <option value="judgments">Judgments (all courts)</option>
+      <option value="supremecourt">Supreme Court</option>
+      <option value="highcourts">High Courts</option>
+      <option value="tribunals">Tribunals</option>
+      <option value="laws">Legislation</option>
+    </select>
+    <select id="sortby">
+      <option value="">Relevance</option>
+      <option value="mostrecent">Most recent</option>
+      <option value="leastrecent">Least recent</option>
+    </select>
+  </div>
+  <div class="filters">
+    <input id="fromdate" type="text" placeholder="From (DD-MM-YYYY)" />
+    <input id="todate" type="text" placeholder="To (DD-MM-YYYY)" />
+  </div>
+  <div class="filters">
+    <input id="author" type="text" placeholder="Judge/author name" />
+    <input id="bench" type="text" placeholder="Bench" />
+    <select id="limit">
+      <option value="10">10 results</option>
+      <option value="25" selected>25 results</option>
+      <option value="50">50 results</option>
+      <option value="100">100 results</option>
+    </select>
+  </div>
+  <div id="controls">
+    <button onclick="doSearch()">Search</button>
+    <button class="secondary" onclick="useDocContext()" title="Uses your current selection, or the paragraph your cursor is in">Search from selection/cursor</button>
+  </div>
+  <div class="tools-row">
+    <button class="secondary" onclick="toggleFindAll()">Find citations in doc</button>
+    <button class="secondary" onclick="toggleXref()">Check cross-references</button>
+    <button class="secondary" onclick="toggleFolders()">Folders</button>
+    <button class="secondary" onclick="toggleCiteFormat()">Cite format</button>
+  </div>
+  <div id="citeFormatArea" hidden>
+    <input id="citeTemplateInput" type="text" placeholder="{title}, {court}{citations} ({url})" />
+    <button onclick="saveCiteTemplate()">Save template</button>
+    <div class="jump-note">Placeholders: {title} {court} {citations} {url} {doc_id}. Used by every "Insert citation" and folder insert.</div>
+  </div>
+  <div id="findAllArea" hidden>
+    <button onclick="runFindAll()">Re-scan document</button>
+    <button class="secondary" onclick="clearFindAllHighlights()">Clear highlights</button>
+    <button class="secondary" onclick="insertTOAUI()">Insert table of authorities</button>
+    <div id="findAllStatus" class="jump-note"></div>
+    <div id="findAllResults"></div>
+  </div>
+  <div id="xrefArea" hidden>
+    <button onclick="runXrefCheck()">Check cross-references</button>
+    <button class="secondary" onclick="clearXrefHighlightsUI()">Clear highlights</button>
+    <div class="jump-note">Flags "Claim D" / "Section 7" style references that never appear as their own defining paragraph elsewhere in the doc -- catches a renamed/renumbered label whose cross-references didn't get updated.</div>
+    <div id="xrefStatus" class="jump-note"></div>
+    <div id="xrefResults"></div>
+  </div>
+  <div id="foldersArea" hidden>
+    <div class="folder-row">
+      <select id="folderSelect"></select>
+      <button class="secondary" onclick="refreshFolders()">Refresh</button>
+    </div>
+    <div id="folderItems"></div>
+  </div>
+  <div id="status"></div>
+  <div id="results"></div>
+  </div>
+  <div id="icPanel" hidden>
+    <input id="icQ" type="text" placeholder="e.g. right to information act" />
+    <div class="filters">
+      <select id="icDoctypes">
+        <option value="">All types</option>
+        <option value="ACT">Acts</option>
+        <option value="SECTION">Sections</option>
+        <option value="RULE">Rules</option>
+        <option value="NOTIFICATION">Notifications</option>
+        <option value="ORDINANCE">Ordinances</option>
+      </select>
+    </div>
+    <button onclick="searchIndiaCodeUI()">Search IndiaCode</button>
+    <div id="icStatus" class="jump-note"></div>
+    <div id="icResults"></div>
+  </div>
+  <div id="comparePanel" hidden>
+    <div class="filters">
+      <select id="compareSourceKind" onchange="onCompareSourceKindChange()">
+        <option value="saved">Saved answer</option>
+        <option value="gdoc">Another Google Doc</option>
+      </select>
+    </div>
+    <select id="compareSavedSelect"></select>
+    <input id="compareGdocUrl" type="text" placeholder="Paste a Google Doc link" hidden />
+    <button onclick="runCompare()">Compare with current selection</button>
+    <div id="compareStatus" class="jump-note"></div>
+    <div id="compareOutput"></div>
+  </div>
+
+  <script>
+    let lastResults = [];
+
+    document.getElementById('q').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') doSearch();
+    });
+    document.getElementById('icQ').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') searchIndiaCodeUI();
+    });
+
+    function doSearch() {
+      const q = document.getElementById('q').value.trim();
+      if (!q) return;
+      setStatus('Searching...');
+      google.script.run
+        .withSuccessHandler(renderResults)
+        .withFailureHandler(showError)
+        .searchCaseLaw(q, {
+          limit: Number(document.getElementById('limit').value),
+          doctypes: document.getElementById('doctypes').value,
+          sortby: document.getElementById('sortby').value,
+          fromdate: document.getElementById('fromdate').value,
+          todate: document.getElementById('todate').value,
+          author: document.getElementById('author').value,
+          bench: document.getElementById('bench').value,
+        });
+    }
+
+    // Pulls whatever's selected (or the current paragraph, if nothing is
+    // selected) straight out of the doc and searches on it -- so you don't
+    // have to re-type the claim you just wrote to go find support for it.
+    function useDocContext() {
+      setStatus('Reading document...');
+      google.script.run
+        .withSuccessHandler(function (text) {
+          if (!text) { setStatus('Nothing selected and no paragraph at the cursor.'); return; }
+          const query = text.length > 300 ? text.slice(0, 300) : text;
+          document.getElementById('q').value = query;
+          doSearch();
+        })
+        .withFailureHandler(showError)
+        .getContextText();
+    }
+
+    function renderResults(results) {
+      lastResults = results;
+      setStatus(results.length + ' result(s)');
+      const div = document.getElementById('results');
+      div.innerHTML = '';
+      results.forEach(function (r) { div.appendChild(buildResultEl(r)); });
+      runRelevanceCheck(results);
+    }
+
+    // Auto-runs right after every search: one Claude call (title/court/
+    // snippet only, cheap) covering the whole page of results, judged
+    // against whatever the lawyer is currently drafting -- so a relevance
+    // tag shows up at the TOP of every card immediately, rather than only
+    // after opening "View full text" on each one individually.
+    function runRelevanceCheck(results) {
+      if (!results.length) return;
+      const subset = results.slice(0, 15);
+      google.script.run
+        .withSuccessHandler(function (context) {
+          if (!context) return; // nothing to judge relevance against -- skip quietly
+          subset.forEach(function (r) {
+            const badge = findRelBadge(r.doc_id);
+            if (badge) { badge.hidden = false; badge.className = 'rel-badge checking'; badge.textContent = 'Checking relevance...'; }
+          });
+          google.script.run
+            .withSuccessHandler(applyRelevance)
+            .withFailureHandler(function () {
+              subset.forEach(function (r) {
+                const badge = findRelBadge(r.doc_id);
+                if (badge) badge.hidden = true;
+              });
+            })
+            .getResultRelevance(context, subset);
+        })
+        .withFailureHandler(function () { /* no context available -- skip quietly */ })
+        .getContextText();
+    }
+
+    function applyRelevance(assist) {
+      (assist.relevance || []).forEach(function (item) {
+        const badge = findRelBadge(item.doc_id);
+        if (!badge) return;
+        badge.hidden = false;
+        badge.className = 'rel-badge';
+        badge.innerHTML =
+          '<span class="rel-tag ' + (item.relevant ? 'yes' : 'no') + '">' +
+          (item.relevant ? 'Relevant' : 'Not relevant') + '</span> &mdash; ' +
+          escapeHtml(item.reason || '');
+      });
+    }
+
+    function findRelBadge(docId) {
+      if (!docId) return null;
+      const card = document.querySelector('.result[data-doc-id="' + cssEscapeAttr(docId) + '"]');
+      return card ? card.querySelector('.rel-badge') : null;
+    }
+
+    function cssEscapeAttr(s) {
+      return String(s).replace(/["\\]/g, '\\$&');
+    }
+
+    // Sends the current selection/paragraph + a real chunk of the judgment
+    // body to the Claude Code CLI (via the backend) to find the single most
+    // relevant paragraph and draft an insertable citation sentence -- lives
+    // at the bottom of the full-text view for the document it's judging,
+    // rather than below the whole results list.
+    //
+    // Deliberately fetches a fresh 20,000-char window from offset 0 rather
+    // than reusing whatever's currently loaded in the panel: a "View full
+    // text" jump lands on the passage the search SNIPPET matched, which for
+    // many judgments is just the case's front-matter block (CASE NO./
+    // PETITIONER/RESPONDENT/BENCH) -- confirmed live, that left the digest
+    // with no real judgment text to pick a paragraph from at all. 20,000
+    // chars from the start comfortably clears that header block on every
+    // judgment seen so far and into real substantive text.
+    function runDocDigest(docId, meta, out) {
+      out.textContent = 'Reading your document...';
+      google.script.run
+        .withSuccessHandler(function (context) {
+          if (!context) { out.textContent = 'Nothing selected and no paragraph at the cursor.'; return; }
+          out.textContent = 'Fetching judgment text...';
+          google.script.run
+            .withSuccessHandler(function (doc) {
+              out.textContent = 'Running Claude Code (can take a few seconds)...';
+              google.script.run
+                .withSuccessHandler(function (digest) { renderDocDigest(digest, out); })
+                .withFailureHandler(function (err) { out.textContent = 'Error: ' + err.message; })
+                .getDocDigest(context, doc.body, meta);
+            })
+            .withFailureHandler(function (err) { out.textContent = 'Error: ' + err.message; })
+            .getDocument(docId, 0, 20000);
+        })
+        .withFailureHandler(function (err) { out.textContent = 'Error: ' + err.message; })
+        .getContextText();
+    }
+
+    function renderDocDigest(digest, out) {
+      out.innerHTML = '';
+      const verdict = document.createElement('div');
+      verdict.className = 'rel-item';
+      verdict.innerHTML =
+        '<span class="rel-tag ' + (digest.relevant ? 'yes' : 'no') + '">' +
+        (digest.relevant ? 'Relevant' : 'Not relevant') + '</span> &mdash; ' +
+        escapeHtml(digest.reason || '');
+      out.appendChild(verdict);
+      if (digest.paragraph) {
+        const para = document.createElement('div');
+        para.className = 'excerpt';
+        para.innerHTML =
+          '<div class="type">Most relevant paragraph</div>' +
+          '<div>' + escapeHtml(digest.paragraph) + '</div>' +
+          '<button data-insert-para>Insert this</button>';
+        para.querySelector('[data-insert-para]').onclick = function () {
+          google.script.run.insertCitation(digest.paragraph);
+        };
+        out.appendChild(para);
+      }
+      if (digest.draft) {
+        const draftBox = document.createElement('div');
+        draftBox.className = 'excerpt';
+        draftBox.innerHTML =
+          '<div class="type">Suggested citation sentence</div>' +
+          '<div>' + escapeHtml(digest.draft) + '</div>' +
+          '<button data-insert-draft>Insert this</button>';
+        draftBox.querySelector('[data-insert-draft]').onclick = function () {
+          google.script.run.insertCitation(digest.draft);
+        };
+        out.appendChild(draftBox);
+      }
+    }
+
+    // Shared by top-level search results and by citation-graph results
+    // (get_citations returns the same shape as search()).
+    function buildResultEl(r) {
+      const el = document.createElement('div');
+      el.className = 'result';
+      el.dataset.docId = r.doc_id || '';
+      const statBits = [];
+      if (r.cites != null) statBits.push('cites ' + r.cites);
+      if (r.cited_by != null) statBits.push('cited by ' + r.cited_by);
+      el.innerHTML =
+        '<h4><a href="' + escapeAttr(r.url || '#') + '" target="_blank">' +
+          escapeHtml(r.title || 'Untitled') + '</a></h4>' +
+        '<div class="rel-badge" hidden></div>' +
+        '<div class="meta">' + escapeHtml(r.court || '') +
+          (statBits.length ? ' &middot; ' + statBits.join(' &middot; ') : '') + '</div>' +
+        '<div class="snippet">' + escapeHtml(r.snippet || '') + '</div>' +
+        '<div class="actions">' +
+          '<button data-view>View full text</button>' +
+          '<button class="secondary" data-cite>Insert citation</button>' +
+          '<button class="secondary" data-save>Save to folder</button>' +
+          (r.doc_id ? '<button class="secondary" data-citedby>Cited by (' + (r.cited_by || 0) + ')</button>' : '') +
+          (r.doc_id ? '<button class="secondary" data-cites>Cites (' + (r.cites || 0) + ')</button>' : '') +
+        '</div>' +
+        '<div class="save-form" hidden><input type="text" placeholder="Folder name" /><button data-save-confirm class="secondary">Save</button></div>' +
+        '<div class="detail" hidden></div>';
+
+      const detail = el.querySelector('.detail');
+      el.querySelector('[data-cite]').onclick = function () { insertCitationText(r); };
+      el.querySelector('[data-view]').onclick = function (ev) {
+        toggleFullText(r, detail, ev.target);
+      };
+      const citedByBtn = el.querySelector('[data-citedby]');
+      if (citedByBtn) citedByBtn.onclick = function () { toggleCitations(r, 'citedby', detail); };
+      const citesBtn = el.querySelector('[data-cites]');
+      if (citesBtn) citesBtn.onclick = function () { toggleCitations(r, 'cites', detail); };
+
+      const saveForm = el.querySelector('.save-form');
+      const saveInput = saveForm.querySelector('input');
+      try {
+        const last = localStorage.getItem('ik_last_folder');
+        if (last) saveInput.value = last;
+      } catch (e) { /* private window / storage blocked -- fine, just no default */ }
+      el.querySelector('[data-save]').onclick = function () { saveForm.hidden = !saveForm.hidden; };
+      saveForm.querySelector('[data-save-confirm]').onclick = function () {
+        const name = saveInput.value.trim();
+        if (!name) return;
+        google.script.run
+          .withSuccessHandler(function () { saveForm.hidden = true; })
+          .withFailureHandler(showError)
+          .saveToFolder(name, { doc_id: r.doc_id, title: r.title, court: r.court, url: r.url, citations: r.citations });
+        try { localStorage.setItem('ik_last_folder', name); } catch (e) { /* fine, just won't be remembered */ }
+      };
+      return el;
+    }
+
+    // Formatting goes through the server-side template (Cite format panel)
+    // rather than being built ad-hoc here, so "Insert citation" and a
+    // folder item's insert always produce the same format.
+    function insertCitationText(r) {
+      google.script.run
+        .withSuccessHandler(function (text) { google.script.run.insertCitation(text); })
+        .withFailureHandler(showError)
+        .formatCitation(r);
+    }
+
+    // "View full text" -- jumps straight to the passage the search snippet
+    // actually came from (via locateInDocument), highlighted and scrolled
+    // into view, rather than always opening at the top of the document.
+    // Falls back to the top if the passage can't be pinned down (e.g. no
+    // snippet to search for, or a genuine no-match).
+    function toggleFullText(r, detail, btn) {
+      if (!detail.hidden) { detail.hidden = true; return; }
+      if (detail.dataset.loaded) { detail.hidden = false; return; }
+      if (!r.doc_id) { detail.hidden = false; detail.textContent = 'No document id for this result.'; return; }
+      detail.hidden = false;
+      detail.textContent = 'Loading document...';
+      if (r.snippet) {
+        google.script.run
+          .withSuccessHandler(function (loc) {
+            if (loc.found) renderLocatedDocument(loc, detail, r.doc_id);
+            else loadFromStart(r.doc_id, detail);
+          })
+          .withFailureHandler(function (err) { detail.textContent = 'Error: ' + err.message; })
+          .locateInDocument(r.doc_id, r.snippet);
+      } else {
+        loadFromStart(r.doc_id, detail);
+      }
+    }
+
+    function loadFromStart(docId, detail) {
+      google.script.run
+        .withSuccessHandler(function (doc) { renderDocument(doc, detail); })
+        .withFailureHandler(function (err) { detail.textContent = 'Error: ' + err.message; })
+        .getDocument(docId, 0, 6000);
+    }
+
+    // Attaches a find-in-text search bar above a .body-text box. Doesn't
+    // touch the box's current markup until the user actually types a term
+    // (so an initial locate-match <mark> from renderLocatedDocument survives
+    // until then) -- clearing the term falls back to plain text rather than
+    // trying to restore that original markup.
+    function attachTextSearch(bodyEl, initialText) {
+      const state = { text: initialText, matches: [], current: -1, term: '' };
+      const bar = document.createElement('div');
+      bar.className = 'textsearch-bar';
+      bar.innerHTML =
+        '<input type="text" placeholder="Search in this document" data-search-input>' +
+        '<button type="button" data-search-prev title="Previous match">&#8593;</button>' +
+        '<button type="button" data-search-next title="Next match">&#8595;</button>' +
+        '<span class="textsearch-count" data-search-count></span>';
+      bodyEl.parentNode.insertBefore(bar, bodyEl);
+      const countEl = bar.querySelector('[data-search-count]');
+
+      function renderHighlighted() {
+        let html = '';
+        let last = 0;
+        state.matches.forEach(function (pos, i) {
+          html += escapeHtml(state.text.slice(last, pos));
+          html += '<mark' + (i === state.current ? ' class="current-match"' : '') + '>' +
+            escapeHtml(state.text.substr(pos, state.term.length)) + '</mark>';
+          last = pos + state.term.length;
+        });
+        html += escapeHtml(state.text.slice(last));
+        bodyEl.innerHTML = html;
+      }
+
+      function scrollToCurrent() {
+        requestAnimationFrame(function () {
+          const el = bodyEl.querySelector('mark.current-match');
+          if (el) el.scrollIntoView({ block: 'center' });
+        });
+      }
+
+      function updateCount() {
+        if (!state.term) countEl.textContent = '';
+        else if (!state.matches.length) countEl.textContent = 'No matches';
+        else countEl.textContent = (state.current + 1) + ' / ' + state.matches.length;
+      }
+
+      function runSearch() {
+        state.matches = [];
+        state.current = -1;
+        if (state.term) {
+          const lower = state.text.toLowerCase();
+          const t = state.term.toLowerCase();
+          let idx = 0;
+          while (idx <= lower.length) {
+            const pos = lower.indexOf(t, idx);
+            if (pos === -1) break;
+            state.matches.push(pos);
+            idx = pos + t.length;
+          }
+        }
+        if (state.matches.length) {
+          state.current = 0;
+          renderHighlighted();
+          scrollToCurrent();
+        } else {
+          bodyEl.textContent = state.text;
+        }
+        updateCount();
+      }
+
+      function step(delta) {
+        if (!state.matches.length) return;
+        state.current = (state.current + delta + state.matches.length) % state.matches.length;
+        renderHighlighted();
+        scrollToCurrent();
+        updateCount();
+      }
+
+      const input = bar.querySelector('[data-search-input]');
+      input.oninput = function () { state.term = input.value.trim(); runSearch(); };
+      input.onkeydown = function (e) { if (e.key === 'Enter') step(e.shiftKey ? -1 : 1); };
+      bar.querySelector('[data-search-prev]').onclick = function () { step(-1); };
+      bar.querySelector('[data-search-next]').onclick = function () { step(1); };
+
+      return {
+        appendText: function (more) {
+          state.text += more;
+          if (state.term) runSearch();
+          else bodyEl.textContent += more;
+        }
+      };
+    }
+
+    // Renders the located window with the matched span highlighted in
+    // <mark> and scrolled into view. Excerpts/insert/load-more all work
+    // the same as renderDocument() below, just seeded from the match
+    // instead of the top of the document.
+    function renderLocatedDocument(loc, detail, docId) {
+      detail.dataset.loaded = '1';
+      detail.dataset.docId = docId;
+      detail.dataset.offset = loc.body_offset + loc.text.length;
+      let html = '<div class="docmeta">' +
+        [loc.court, loc.bench, loc.citations].filter(Boolean).map(escapeHtml).join(' &middot; ') +
+        '</div>';
+      (loc.key_excerpts || []).forEach(function (ex, i) {
+        html += '<div class="excerpt" data-excerpt-idx="' + i + '">' +
+          '<div class="type">' + escapeHtml(ex.type) + '</div>' +
+          '<div>' + escapeHtml(ex.text) + '</div>' +
+          '<button data-insert-excerpt="' + i + '">Insert this</button>' +
+        '</div>';
+      });
+      html += '<div class="body-text"></div>';
+      html += '<div class="actions" style="margin-top:6px">' +
+        '<button data-from-start class="secondary">Read from beginning</button>' +
+        (loc.body_offset + loc.text.length < loc.total_chars ? '<button data-more>Load more text</button>' : '') +
+      '</div>';
+      html += '<div class="digest-area">' +
+        '<button data-digest>Ready-to-draft digest (most relevant paragraph)</button>' +
+        '<div class="digest-output"></div>' +
+      '</div>';
+      detail.innerHTML = html;
+
+      const bodyEl = detail.querySelector('.body-text');
+      bodyEl.innerHTML =
+        escapeHtml(loc.text.slice(0, loc.match_start)) +
+        '<mark>' + escapeHtml(loc.text.slice(loc.match_start, loc.match_end)) + '</mark>' +
+        escapeHtml(loc.text.slice(loc.match_end));
+      const search = attachTextSearch(bodyEl, loc.text);
+
+      (loc.key_excerpts || []).forEach(function (ex, i) {
+        detail.querySelector('[data-insert-excerpt="' + i + '"]').onclick = function () {
+          google.script.run.insertCitation(ex.text);
+        };
+      });
+      detail.querySelector('[data-from-start]').onclick = function () { loadFromStart(docId, detail); };
+      const moreBtn = detail.querySelector('[data-more]');
+      if (moreBtn) {
+        moreBtn.onclick = function () {
+          moreBtn.textContent = 'Loading...';
+          google.script.run
+            .withSuccessHandler(function (doc2) {
+              search.appendText(doc2.body);
+              detail.dataset.offset = doc2.offset + doc2.chars_returned;
+              if (!doc2.has_more) moreBtn.remove();
+              else moreBtn.textContent = 'Load more text';
+            })
+            .withFailureHandler(function (err) { moreBtn.textContent = 'Error: ' + err.message; })
+            .getDocument(docId, Number(detail.dataset.offset), 6000);
+        };
+      }
+      detail.querySelector('[data-digest]').onclick = function () {
+        runDocDigest(docId, { title: loc.title, court: loc.court, citations: loc.citations }, detail.querySelector('.digest-output'));
+      };
+
+      requestAnimationFrame(function () {
+        const markEl = bodyEl.querySelector('mark');
+        if (markEl) markEl.scrollIntoView({ block: 'center' });
+      });
+    }
+
+    function renderDocument(doc, detail) {
+      detail.dataset.loaded = '1';
+      detail.dataset.docId = doc.doc_id;
+      detail.dataset.offset = doc.offset + doc.chars_returned;
+      let html = '<div class="docmeta">' +
+        [doc.court, doc.bench, doc.citations].filter(Boolean).map(escapeHtml).join(' &middot; ') +
+        '</div>';
+      if (doc.low_confidence_extraction) {
+        html += '<div class="low-confidence">' + escapeHtml(doc.low_confidence_extraction) + '</div>';
+      }
+      (doc.key_excerpts || []).forEach(function (ex, i) {
+        html += '<div class="excerpt" data-excerpt-idx="' + i + '">' +
+          '<div class="type">' + escapeHtml(ex.type) + '</div>' +
+          '<div>' + escapeHtml(ex.text) + '</div>' +
+          '<button data-insert-excerpt="' + i + '">Insert this</button>' +
+        '</div>';
+      });
+      html += '<div class="body-text"></div>';
+      html += '<div class="actions" style="margin-top:6px">' +
+        (doc.has_more ? '<button data-more>Load more text</button>' : '') +
+      '</div>';
+      html += '<div class="digest-area">' +
+        '<button data-digest>Ready-to-draft digest (most relevant paragraph)</button>' +
+        '<div class="digest-output"></div>' +
+      '</div>';
+      detail.innerHTML = html;
+      const bodyEl = detail.querySelector('.body-text');
+      bodyEl.textContent = doc.body;
+      const search = attachTextSearch(bodyEl, doc.body);
+
+      (doc.key_excerpts || []).forEach(function (ex, i) {
+        detail.querySelector('[data-insert-excerpt="' + i + '"]').onclick = function () {
+          google.script.run.insertCitation(ex.text);
+        };
+      });
+      const moreBtn = detail.querySelector('[data-more]');
+      if (moreBtn) {
+        moreBtn.onclick = function () {
+          moreBtn.textContent = 'Loading...';
+          google.script.run
+            .withSuccessHandler(function (doc2) {
+              search.appendText(doc2.body);
+              detail.dataset.offset = doc2.offset + doc2.chars_returned;
+              if (!doc2.has_more) moreBtn.remove();
+              else moreBtn.textContent = 'Load more text';
+            })
+            .withFailureHandler(function (err) { moreBtn.textContent = 'Error: ' + err.message; })
+            .getDocument(detail.dataset.docId, Number(detail.dataset.offset), 6000);
+        };
+      }
+      detail.querySelector('[data-digest]').onclick = function () {
+        runDocDigest(doc.doc_id, { title: doc.title, court: doc.court, citations: doc.citations }, detail.querySelector('.digest-output'));
+      };
+    }
+
+    // "Cited by" / "Cites" -- IndiaKanoon's real citation graph (not just
+    // the counts), for finding precedent chains without leaving the doc.
+    function toggleCitations(r, direction, detail) {
+      if (!detail.hidden) { detail.hidden = true; return; }
+      detail.hidden = false;
+      detail.innerHTML = 'Loading ' + (direction === 'citedby' ? 'citing cases' : 'cited precedents') + '...';
+      google.script.run
+        .withSuccessHandler(function (results) {
+          detail.innerHTML = '';
+          const label = document.createElement('div');
+          label.className = 'docmeta';
+          label.textContent = (direction === 'citedby' ? 'Cases citing this one:' : 'Cases this one relies on:');
+          detail.appendChild(label);
+          const list = document.createElement('div');
+          list.className = 'citelist';
+          if (!results.length) list.textContent = 'None found.';
+          results.forEach(function (cr) { list.appendChild(buildResultEl(cr)); });
+          detail.appendChild(list);
+        })
+        .withFailureHandler(function (err) { detail.textContent = 'Error: ' + err.message; })
+        .getCitations(r.doc_id, direction);
+    }
+
+    // ---- Cite format ----
+    function toggleCiteFormat() {
+      const el = document.getElementById('citeFormatArea');
+      el.hidden = !el.hidden;
+      if (!el.hidden && !el.dataset.loaded) {
+        el.dataset.loaded = '1';
+        google.script.run
+          .withSuccessHandler(function (t) { document.getElementById('citeTemplateInput').value = t; })
+          .getCiteTemplate();
+      }
+    }
+
+    function saveCiteTemplate() {
+      google.script.run.setCiteTemplate(document.getElementById('citeTemplateInput').value);
+    }
+
+    // ---- Find All / Link to Cites ----
+    let lastFindAllMatches = [];
+
+    // Auto-scans the first time the panel opens (not on every open) so it
+    // behaves proactively rather than requiring a manual trigger every
+    // time -- re-scan after edits still needs the button, since Docs
+    // exposes no change-event trigger an Add-on can listen for.
+    function toggleFindAll() {
+      const el = document.getElementById('findAllArea');
+      el.hidden = !el.hidden;
+      if (!el.hidden && !el.dataset.autorun) {
+        el.dataset.autorun = '1';
+        runFindAll();
+      }
+    }
+
+    // Clears the PREVIOUS scan's highlights before finding/applying new
+    // ones -- without this, a re-scan that finds fewer/different matches
+    // than last time leaves stale highlights sitting on text that no
+    // longer matches (confirmed live: re-scanning after a false-positive
+    // fix left the old false match still highlighted).
+    function runFindAll() {
+      const status = document.getElementById('findAllStatus');
+      const out = document.getElementById('findAllResults');
+      status.textContent = 'Scanning document...';
+      out.innerHTML = '';
+      const clearedHandler = function () { scanAndHighlight(status, out); };
+      google.script.run
+        .withSuccessHandler(clearedHandler)
+        .withFailureHandler(clearedHandler) // a clear failure shouldn't block a fresh scan
+        .clearCitationHighlights(lastFindAllMatches);
+    }
+
+    function scanAndHighlight(status, out) {
+      google.script.run
+        .withSuccessHandler(function (matches) {
+          lastFindAllMatches = matches;
+          status.textContent = matches.length + ' possible citation(s) found -- highlighted in the document. Heuristic pattern match -- verify before linking.';
+          matches.forEach(function (m) { out.appendChild(buildCitationMatchEl(m)); });
+          google.script.run.highlightCitationMatches(matches);
+        })
+        .withFailureHandler(function (err) { status.textContent = 'Error: ' + err.message; })
+        .findAllCitations();
+    }
+
+    function clearFindAllHighlights() {
+      google.script.run.clearCitationHighlights(lastFindAllMatches);
+    }
+
+    // Table of authorities / bulk export -- built from whatever Find All
+    // last scanned. Entries the lawyer actually linked carry the real
+    // title/url; everything else still shows up, just labeled unlinked, so
+    // this doubles as a flat citation export even before any linking.
+    function insertTOAUI() {
+      const status = document.getElementById('findAllStatus');
+      if (!lastFindAllMatches.length) { status.textContent = 'Run "Re-scan document" first.'; return; }
+      const entries = lastFindAllMatches.map(function (m) {
+        return { type: m.type, text: m.text, url: m.linkedUrl || null, title: m.linkedTitle || null };
+      });
+      status.textContent = 'Inserting table of authorities...';
+      google.script.run
+        .withSuccessHandler(function (r) { status.textContent = 'Inserted ' + r.inserted + ' entries at the end of the document.'; })
+        .withFailureHandler(function (err) { status.textContent = 'Error: ' + err.message; })
+        .insertTableOfAuthorities(entries);
+    }
+
+    // ---- Cross-reference checker -- flags "Claim D" / "Section 7" style
+    // references that never appear as their own defining paragraph
+    // elsewhere in the doc (see checkCrossReferences in Code.gs for what
+    // "defined" means and the deliberate scope limit vs. a full citation-
+    // accuracy checker). ----
+    let lastXrefIssues = [];
+
+    function toggleXref() {
+      const el = document.getElementById('xrefArea');
+      el.hidden = !el.hidden;
+      if (!el.hidden && !el.dataset.autorun) {
+        el.dataset.autorun = '1';
+        runXrefCheck();
+      }
+    }
+
+    function runXrefCheck() {
+      const status = document.getElementById('xrefStatus');
+      const out = document.getElementById('xrefResults');
+      status.textContent = 'Checking...';
+      out.innerHTML = '';
+      google.script.run
+        .withSuccessHandler(function () { scanXref(status, out); })
+        .withFailureHandler(function () { scanXref(status, out); }) // a clear failure shouldn't block a fresh check
+        .clearXrefHighlights(lastXrefIssues);
+    }
+
+    function scanXref(status, out) {
+      google.script.run
+        .withSuccessHandler(function (issues) {
+          lastXrefIssues = issues;
+          if (!issues.length) { status.textContent = 'No dangling cross-references found.'; return; }
+          status.textContent = issues.length + ' possible dangling reference(s) -- highlighted in the document.';
+          issues.forEach(function (m) {
+            const el = document.createElement('div');
+            el.className = 'xref-issue';
+            el.innerHTML = '<span class="xtext">' + escapeHtml(m.text) + '</span> — no paragraph starts with "' + escapeHtml(m.label) + '" anywhere in the doc.';
+            out.appendChild(el);
+          });
+          google.script.run.highlightXrefIssues(issues);
+        })
+        .withFailureHandler(function (err) { status.textContent = 'Error: ' + err.message; })
+        .checkCrossReferences();
+    }
+
+    function clearXrefHighlightsUI() {
+      google.script.run.clearXrefHighlights(lastXrefIssues);
+    }
+
+    // Which Find-All match types route to IndiaCode's search/link instead
+    // of IndianKanoon's -- see the matching CITATION_PATTERNS_ entries in
+    // Code.gs.
+    const IC_MATCH_TYPES_ = { 'Act': true, 'Rules': true };
+
+    // Maps a Find-All match type to its chip color class -- blue/indigo
+    // family = case-law types, green/teal family = legislation types (see
+    // the .ctype-* rules), so the color itself signals which source
+    // "Search & link" will use.
+    const CTYPE_CLASS_ = {
+      'AIR': 'ctype-air', 'SCC': 'ctype-scc', 'SCC OnLine': 'ctype-scc-online',
+      'Neutral': 'ctype-neutral', 'Case number': 'ctype-case-number',
+      'Case name': 'ctype-case-name', 'Act': 'ctype-act', 'Rules': 'ctype-rules',
+    };
+    function ctypeClass(type) { return CTYPE_CLASS_[type] || 'ctype-case-number'; }
+
+    function buildCitationMatchEl(m) {
+      const el = document.createElement('div');
+      el.className = 'citation-match';
+      el.innerHTML =
+        '<div class="ctype ' + ctypeClass(m.type) + '">' + escapeHtml(m.type) + '</div>' +
+        '<div class="ctext">' + escapeHtml(m.text) + '</div>' +
+        '<div class="actions">' +
+          '<button data-check class="secondary">Check format</button>' +
+          '<button data-search class="secondary">Search &amp; link</button>' +
+        '</div>' +
+        '<div class="format-result"></div>' +
+        '<div class="link-search" hidden></div>';
+
+      const typeEl = el.querySelector('.ctype');
+      const formatResult = el.querySelector('.format-result');
+      el.querySelector('[data-check]').onclick = function () {
+        google.script.run
+          .withSuccessHandler(function (r) {
+            if (!r.checked) { formatResult.textContent = 'No structural check for this type.'; formatResult.className = 'format-result'; return; }
+            formatResult.className = 'format-result ' + (r.wellFormed ? 'format-ok' : 'format-bad');
+            formatResult.textContent = r.wellFormed ? 'Well-formed.' : 'Looks malformed (unexpected spacing/structure for ' + m.type + ').';
+          })
+          .checkCitationFormat(m.text, m.type);
+      };
+
+      const linkSearch = el.querySelector('.link-search');
+      const isIndiaCode = !!IC_MATCH_TYPES_[m.type];
+      el.querySelector('[data-search]').onclick = function () {
+        linkSearch.hidden = !linkSearch.hidden;
+        if (linkSearch.hidden || linkSearch.dataset.loaded) return;
+        linkSearch.dataset.loaded = '1';
+        linkSearch.textContent = 'Searching...';
+        const call = google.script.run
+          .withSuccessHandler(function (results) {
+            linkSearch.innerHTML = '';
+            if (!results.length) { linkSearch.textContent = 'No results.'; return; }
+            results.slice(0, 5).forEach(function (r) { linkSearch.appendChild(buildLinkChoiceEl(r, m, typeEl, el, isIndiaCode)); });
+          })
+          .withFailureHandler(function (err) { linkSearch.textContent = 'Error: ' + err.message; });
+        if (isIndiaCode) call.searchIndiaCode(m.text, { limit: 5 });
+        else call.searchCaseLaw(m.text, { limit: 5 });
+      };
+      return el;
+    }
+
+    function buildLinkChoiceEl(r, m, typeEl, matchEl, isIndiaCode) {
+      const item = document.createElement('div');
+      item.className = 'link-choice';
+      const meta = isIndiaCode ? [r.collection, r.act_year].filter(Boolean).join(' · ') : (r.court || '');
+      item.innerHTML =
+        '<div>' + escapeHtml(r.title || 'Untitled') + '</div>' +
+        '<div class="meta">' + escapeHtml(meta) + '</div>' +
+        '<button data-link class="secondary">Link this text to it</button>';
+      item.querySelector('[data-link]').onclick = function () {
+        google.script.run
+          .withSuccessHandler(function () {
+            typeEl.textContent += ' — linked';
+            matchEl.style.opacity = '0.6';
+            // Recorded so "Insert table of authorities" can pull the real
+            // title/url for entries the lawyer actually confirmed, instead
+            // of just the raw matched text.
+            m.linkedUrl = r.url;
+            m.linkedTitle = r.title;
+          })
+          .withFailureHandler(showError)
+          .linkFoundCitation(m.start, m.end, r.url);
+      };
+      return item;
+    }
+
+    // ---- Folders ----
+    let currentFoldersData = {};
+
+    function toggleFolders() {
+      const el = document.getElementById('foldersArea');
+      el.hidden = !el.hidden;
+      if (!el.hidden) refreshFolders();
+    }
+
+    function refreshFolders() {
+      google.script.run
+        .withSuccessHandler(renderFolders)
+        .withFailureHandler(showError)
+        .listFolders();
+    }
+
+    function renderFolders(folders) {
+      currentFoldersData = folders;
+      const select = document.getElementById('folderSelect');
+      const names = Object.keys(folders);
+      select.innerHTML = names.length
+        ? names.map(function (n) {
+            return '<option value="' + escapeAttr(n) + '">' + escapeHtml(n) + ' (' + folders[n].length + ')</option>';
+          }).join('')
+        : '<option value="">No folders yet</option>';
+      select.onchange = function () { renderFolderItems(select.value); };
+      renderFolderItems(select.value);
+    }
+
+    function renderFolderItems(name) {
+      const container = document.getElementById('folderItems');
+      container.innerHTML = '';
+      (currentFoldersData[name] || []).forEach(function (item) {
+        const row = document.createElement('div');
+        row.className = 'folder-item';
+        row.innerHTML =
+          '<span>' + escapeHtml(item.title || 'Untitled') + '</span>' +
+          '<span class="fi-actions">' +
+            '<button data-ins class="secondary">Insert</button>' +
+            '<button data-rm class="secondary">Remove</button>' +
+          '</span>';
+        row.querySelector('[data-ins]').onclick = function () {
+          google.script.run
+            .withSuccessHandler(function (text) { google.script.run.insertCitation(text); })
+            .formatCitation(item);
+        };
+        row.querySelector('[data-rm]').onclick = function () {
+          google.script.run.withSuccessHandler(renderFolders).removeFromFolder(name, item.doc_id);
+        };
+        container.appendChild(row);
+      });
+    }
+
+    // ---- Saved answers (bridged from a Claude Desktop chat via
+    // indiankanoon_mcp's indiankanoon_save_answer tool -- see
+    // api_server.py's /saved_answers endpoints) ----
+    function refreshSavedAnswers() {
+      const list = document.getElementById('savedAnswersList');
+      list.textContent = 'Loading...';
+      google.script.run
+        .withSuccessHandler(renderSavedAnswers)
+        .withFailureHandler(function (err) { list.textContent = 'Error: ' + err.message; })
+        .listSavedAnswers();
+    }
+
+    function renderSavedAnswers(items) {
+      const list = document.getElementById('savedAnswersList');
+      list.innerHTML = '';
+      if (!items.length) {
+        list.textContent = 'No saved answers yet.';
+        return;
+      }
+      items.forEach(function (item) { list.appendChild(buildSavedAnswerEl(item)); });
+    }
+
+    function buildSavedAnswerEl(item) {
+      const el = document.createElement('div');
+      el.className = 'saved-answer-item';
+      const when = item.created_at ? new Date(item.created_at).toLocaleString() : '';
+      el.innerHTML =
+        '<div class="sa-title">' + escapeHtml(item.title || 'Untitled') + '</div>' +
+        '<div class="sa-meta">' + [when, item.query].filter(Boolean).map(escapeHtml).join(' &middot; ') + '</div>' +
+        '<div class="detail" hidden></div>';
+      const detail = el.querySelector('.detail');
+      el.querySelector('.sa-title').onclick = function () { toggleSavedAnswerDetail(item.id, detail); };
+      return el;
+    }
+
+    function toggleSavedAnswerDetail(id, detail) {
+      if (!detail.hidden) { detail.hidden = true; return; }
+      if (detail.dataset.loaded) { detail.hidden = false; return; }
+      detail.hidden = false;
+      detail.textContent = 'Loading...';
+      google.script.run
+        .withSuccessHandler(function (full) { renderSavedAnswerDetail(full, detail); })
+        .withFailureHandler(function (err) { detail.textContent = 'Error: ' + err.message; })
+        .getSavedAnswer(id);
+    }
+
+    function renderSavedAnswerDetail(full, detail) {
+      detail.dataset.loaded = '1';
+      detail.innerHTML = '';
+      const textBox = document.createElement('div');
+      textBox.className = 'sa-text';
+      textBox.textContent = full.answer || '';
+      detail.appendChild(textBox);
+      const insertBtn = document.createElement('button');
+      insertBtn.textContent = 'Insert answer text';
+      insertBtn.onclick = function () { google.script.run.insertCitation(full.answer); };
+      detail.appendChild(insertBtn);
+      (full.citations || []).forEach(function (c) {
+        const row = document.createElement('div');
+        row.className = 'link-choice';
+        row.innerHTML =
+          '<div>' + escapeHtml(c.title || 'Untitled') + '</div>' +
+          '<div class="meta">' + escapeHtml(c.court || '') + '</div>' +
+          '<button class="secondary" data-cite>Insert citation</button>';
+        row.querySelector('[data-cite]').onclick = function () { insertCitationText(c); };
+        detail.appendChild(row);
+      });
+    }
+
+    // ---- Four top-level tabs, flipped between via the bar at the top:
+    // IndianKanoon (case law), IndiaCode (legislation -- a plain JSON REST
+    // API, genuinely different result metadata so it isn't forced into
+    // IndianKanoon's search/results UI), Saved answers (its own tab rather
+    // than nested in either, since a saved answer can cite from both
+    // sources), and Compare (word-diff against a saved answer or another
+    // Google Doc). ----
+    function switchSourceTab(tab) {
+      document.getElementById('ikPanel').hidden = tab !== 'ik';
+      document.getElementById('icPanel').hidden = tab !== 'ic';
+      document.getElementById('savedAnswersArea').hidden = tab !== 'sa';
+      document.getElementById('comparePanel').hidden = tab !== 'cm';
+      document.getElementById('tabIK').classList.toggle('active', tab === 'ik');
+      document.getElementById('tabIC').classList.toggle('active', tab === 'ic');
+      document.getElementById('tabSA').classList.toggle('active', tab === 'sa');
+      document.getElementById('tabCM').classList.toggle('active', tab === 'cm');
+      if (tab === 'sa') refreshSavedAnswers();
+      if (tab === 'cm') refreshCompareSavedOptions();
+    }
+
+    // ---- Compare / redline -- word-diff the current selection (or
+    // cursor paragraph) against a saved answer or another Google Doc.
+    // Diff renders inline in the sidebar (insertions/deletions styled),
+    // not as tracked changes in the doc itself. ----
+    function onCompareSourceKindChange() {
+      const isGdoc = document.getElementById('compareSourceKind').value === 'gdoc';
+      document.getElementById('compareSavedSelect').hidden = isGdoc;
+      document.getElementById('compareGdocUrl').hidden = !isGdoc;
+    }
+
+    function refreshCompareSavedOptions() {
+      const select = document.getElementById('compareSavedSelect');
+      if (document.getElementById('compareSourceKind').value !== 'saved') return;
+      select.innerHTML = '<option value="">Loading...</option>';
+      google.script.run
+        .withSuccessHandler(function (items) {
+          select.innerHTML = items.length
+            ? items.map(function (it) { return '<option value="' + escapeAttr(it.id) + '">' + escapeHtml(it.title || 'Untitled') + '</option>'; }).join('')
+            : '<option value="">No saved answers yet</option>';
+        })
+        .withFailureHandler(function (err) { select.innerHTML = '<option value="">Error loading</option>'; })
+        .listSavedAnswers();
+    }
+
+    function runCompare() {
+      const status = document.getElementById('compareStatus');
+      const out = document.getElementById('compareOutput');
+      const kind = document.getElementById('compareSourceKind').value;
+      const source = kind === 'gdoc'
+        ? { kind: 'gdoc', urlOrId: document.getElementById('compareGdocUrl').value.trim() }
+        : { kind: 'saved', id: document.getElementById('compareSavedSelect').value };
+      if (kind === 'gdoc' && !source.urlOrId) { status.textContent = 'Paste a Google Doc link first.'; return; }
+      if (kind === 'saved' && !source.id) { status.textContent = 'Pick a saved answer first.'; return; }
+      out.innerHTML = '';
+      status.textContent = 'Reading your selection...';
+      google.script.run
+        .withSuccessHandler(function (context) {
+          if (!context) { status.textContent = 'Nothing selected and no paragraph at the cursor.'; return; }
+          status.textContent = 'Comparing...';
+          google.script.run
+            .withSuccessHandler(function (result) { status.textContent = ''; renderDiff(result.diff, out); })
+            .withFailureHandler(function (err) { status.textContent = 'Error: ' + err.message; })
+            .compareWithSource(context, source);
+        })
+        .withFailureHandler(function (err) { status.textContent = 'Error: ' + err.message; })
+        .getContextText();
+    }
+
+    function renderDiff(diff, out) {
+      const box = document.createElement('div');
+      box.className = 'diff-box';
+      box.innerHTML = diff.map(function (d) {
+        const t = escapeHtml(d.text);
+        if (d.type === 'insert') return '<span class="diff-insert">' + t + '</span>';
+        if (d.type === 'delete') return '<span class="diff-delete">' + t + '</span>';
+        return t;
+      }).join('');
+      out.appendChild(box);
+      const legend = document.createElement('div');
+      legend.className = 'jump-note';
+      legend.style.marginTop = '4px';
+      legend.textContent = 'Green = only in your current draft. Red = only in the other source.';
+      out.appendChild(legend);
+    }
+
+    function searchIndiaCodeUI() {
+      const q = document.getElementById('icQ').value.trim();
+      if (!q) return;
+      const status = document.getElementById('icStatus');
+      const results = document.getElementById('icResults');
+      status.textContent = 'Searching...';
+      results.innerHTML = '';
+      google.script.run
+        .withSuccessHandler(function (items) {
+          status.textContent = items.length + ' result(s)';
+          items.forEach(function (item) { results.appendChild(buildIndiaCodeResultEl(item)); });
+        })
+        .withFailureHandler(function (err) { status.textContent = 'Error: ' + err.message; })
+        .searchIndiaCode(q, { limit: 25, doctypes: document.getElementById('icDoctypes').value });
+    }
+
+    function buildIndiaCodeResultEl(item) {
+      const el = document.createElement('div');
+      el.className = 'result';
+      const metaBits = [item.collection, item.act_year, item.ministry, item.department].filter(Boolean);
+      el.innerHTML =
+        '<h4><a href="' + escapeAttr(item.url || '#') + '" target="_blank">' +
+          escapeHtml(item.title || 'Untitled') + '</a></h4>' +
+        '<div class="meta">' + escapeHtml(metaBits.join(' · ')) + '</div>' +
+        '<div class="actions">' +
+          '<button data-view>View full text</button>' +
+          '<button class="secondary" data-cite>Insert citation</button>' +
+        '</div>' +
+        '<div class="detail" hidden></div>';
+      const detail = el.querySelector('.detail');
+      el.querySelector('[data-view]').onclick = function () { toggleIndiaCodeFullText(item, detail); };
+      el.querySelector('[data-cite]').onclick = function () {
+        const cite = (item.title || 'Untitled') + (item.act_year ? ' (' + item.act_year + ')' : '') + ' (' + (item.url || '') + ')';
+        google.script.run.insertCitation(cite);
+      };
+      return el;
+    }
+
+    function toggleIndiaCodeFullText(item, detail) {
+      if (!detail.hidden) { detail.hidden = true; return; }
+      if (detail.dataset.loaded) { detail.hidden = false; return; }
+      detail.hidden = false;
+      detail.textContent = 'Loading document...';
+      loadIndiaCodeFromStart(item, detail);
+    }
+
+    function loadIndiaCodeFromStart(item, detail) {
+      google.script.run
+        .withSuccessHandler(function (doc) { renderIndiaCodeDocument(item, doc, detail); })
+        .withFailureHandler(function (err) { detail.textContent = 'Error: ' + err.message; })
+        .getIndiaCodeDocument(item.uuid, 0, 6000);
+    }
+
+    function renderIndiaCodeDocument(item, doc, detail) {
+      detail.dataset.loaded = '1';
+      detail.dataset.offset = doc.offset + doc.chars_returned;
+      let html = '<div class="body-text"></div>';
+      html += '<div class="actions" style="margin-top:6px">' +
+        (doc.has_more ? '<button data-more>Load more text</button>' : '') +
+      '</div>';
+      html += '<div class="digest-area">' +
+        '<button data-def class="secondary">Find definition of selection</button>' +
+        '<div class="digest-output"></div>' +
+      '</div>';
+      detail.innerHTML = html;
+      const bodyEl = detail.querySelector('.body-text');
+      bodyEl.textContent = doc.body;
+      const search = attachTextSearch(bodyEl, doc.body);
+      const moreBtn = detail.querySelector('[data-more]');
+      if (moreBtn) {
+        moreBtn.onclick = function () {
+          moreBtn.textContent = 'Loading...';
+          google.script.run
+            .withSuccessHandler(function (doc2) {
+              search.appendText(doc2.body);
+              detail.dataset.offset = doc2.offset + doc2.chars_returned;
+              if (!doc2.has_more) moreBtn.remove();
+              else moreBtn.textContent = 'Load more text';
+            })
+            .withFailureHandler(function (err) { moreBtn.textContent = 'Error: ' + err.message; })
+            .getIndiaCodeDocument(item.uuid, Number(detail.dataset.offset), 6000);
+        };
+      }
+      detail.querySelector('[data-def]').onclick = function () {
+        runDefinitionLookup(item, detail.querySelector('.digest-output'));
+      };
+    }
+
+    // ---- Definition lookup (IndiaCode) -- select a term in the draft,
+    // find where the currently-open Act/Rules item actually defines it
+    // ("<term>" means ...), rather than making the lawyer scroll a
+    // possibly enormous Act by hand. ----
+    function runDefinitionLookup(item, out) {
+      out.textContent = 'Reading your selection...';
+      google.script.run
+        .withSuccessHandler(function (term) {
+          if (!term) { out.textContent = 'Select a term in the document first.'; return; }
+          out.textContent = 'Searching ' + (item.title || 'this Act') + ' for a definition...';
+          google.script.run
+            .withSuccessHandler(function (result) { renderDefinitionResult(result, out); })
+            .withFailureHandler(function (err) { out.textContent = 'Error: ' + err.message; })
+            .findDefinitionInIndiaCode(item.uuid, term);
+        })
+        .withFailureHandler(function (err) { out.textContent = 'Error: ' + err.message; })
+        .getContextText();
+    }
+
+    function renderDefinitionResult(result, out) {
+      out.innerHTML = '';
+      if (!result.found) {
+        out.textContent = 'No definition of "' + result.term + '" found in this document (it may be defined elsewhere, or phrased without "means").';
+        return;
+      }
+      const box = document.createElement('div');
+      box.className = 'excerpt';
+      box.innerHTML =
+        '<div class="type">Definition of "' + escapeHtml(result.term) + '"</div>' +
+        '<div>' + escapeHtml(result.clause) + '</div>' +
+        '<button data-insert-def>Insert this</button>';
+      box.querySelector('[data-insert-def]').onclick = function () {
+        google.script.run.insertCitation(result.clause);
+      };
+      out.appendChild(box);
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    function showError(err) {
+      setStatus('Error: ' + err.message);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    function escapeAttr(s) { return escapeHtml(s); }
+  </script>
+</body>
+</html>

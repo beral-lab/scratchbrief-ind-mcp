@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+
+.chrome-profile/
+.chrome-profile-mcp/
+cloudflared.log
+
+.ik_proxy_token
+google_oauth_credentials.json
+saved_answers_token.json
+saved_answers/
+
+docs-addon/.clasp.json
+docs-addon/LocalConfig.gs

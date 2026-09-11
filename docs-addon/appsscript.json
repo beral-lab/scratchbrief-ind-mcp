@@ -1,0 +1,27 @@
+{
+  "timeZone": "Asia/Kolkata",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/documents.currentonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.container.ui",
+    "https://www.googleapis.com/auth/spreadsheets"
+  ],
+  "addOns": {
+    "common": {
+      "name": "ScratchBrief-Ind",
+      "logoUrl": "https://drive.google.com/uc?export=view&id=1nlQ1vCkCLoV9hNAMFhYEHDPFa4Hl2IuD",
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      }
+    },
+    "docs": {
+      "homepageTrigger": {
+        "runFunction": "onHomepage"
+      }
+    }
+  }
+}
