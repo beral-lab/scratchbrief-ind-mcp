@@ -198,10 +198,3 @@ tab for anyone on the team, not just the machine that ran the tool. Setup:
 Without `ANSWERS_SPREADSHEET_ID` set, `indiankanoon_save_answer` raises a
 clear error rather than silently writing nowhere.
 
-## A note on terms of service
-
-This scrapes IndiaKanoon's public pages directly (no account, no paywall
-bypass) rather than automating a logged-in session. Worth checking
-IndiaKanoon's terms before relying on this for heavy/automated use —
-scraping frequency and Cloudflare's presence both suggest they'd rather
-this be used lightly than hammered.
