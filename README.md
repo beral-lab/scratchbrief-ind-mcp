@@ -5,29 +5,7 @@ case law from every Indian court and tribunal, PLUS legislation (Central
 and State Acts, Rules, Regulations, Ordinances, Notifications), the
 Constitution, international treaties, Law Commission reports, Constituent
 Assembly Debates, and Lok Sabha/Rajya Sabha material — and fetches full
-document text, scraped live via [nodriver](https://github.com/ultrafunkamsterdam/nodriver)
-— undetected, CDP-based Chrome automation (the modern successor to
-`undetected-chromedriver`).
-
-## Why nodriver, specifically
-
-IndiaKanoon is public (no login, unlike `scc-mcp`'s SCC Online), but it sits
-behind Cloudflare's JS challenge. Confirmed directly against the live site:
-
-- A plain `curl` request gets a 403 / the "Just a moment..." challenge page.
-- A **headless** Chrome (even via nodriver) gets stuck on that challenge
-  page indefinitely.
-- A **headful** (visible) Chrome clears it in 0-2 seconds, and writes
-  Cloudflare's clearance cookie into the Chrome profile directory.
-- A **headless** browser that reuses that same profile directory afterwards
-  clears the challenge instantly too — no visible window needed again.
-
-So `browser.py` keeps one persistent Chrome profile on disk
-(`.chrome-profile/`, gitignored — delete it any time to reset). Nearly every
-call reuses it headless. Only the first call ever (or after the clearance
-cookie expires) pays for one quick, **fully automated** headful warm-up pass
-— unlike a login flow, no human needs to do anything; it just briefly opens
-and closes a Chrome window.
+document text, scraped live via [nodriver](https://github.com/ultrafunkamsterdam/nodriver).
 
 ## Setup
 
